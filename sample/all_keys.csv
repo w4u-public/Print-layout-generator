@@ -1,0 +1,4 @@
+{R}名前,名前1,名前2,名前3,名前4,名前5,概要,OH,OW,VH,VW,{G}テキスト1,テキスト2,{R}テキスト3,{R}テキスト4,テキスト5,フォルダ,枚数,ドブ
+A,B,C,D,E,F,Description,350,550,300,500,Text1,Text2,Text3,Text4,Text5,,1,
+1,Illustrator,Layout,Charactor A,,,My first illustration,500,500,400,300,Type,2D,Hello World,TEST,By w4u,,3,
+2,Illustrator,Script,Product Label,,,,A4,,,,Type,3D,,TEST,By w4u,my_folder,10,

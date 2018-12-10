@@ -20,16 +20,16 @@
         var $colorModeCMYK = true; // カラーモード (false は RGB)
         var $visualRectColor = 'red'; // 見え寸線の色 (red | green | blue)
         var $closeDoc = false; // 生成後に保存じて閉じる
-        var $multiArtboards = true; //
+        var $multiArtboards = false; // 複数のアートボードにレイアウトをまとめる
 
         // Options
-        var $layerLock = false; // 非編集レイヤーのロック
-        var $displaySize = true; // 寸法を図に明記
+        var $layerLock = true; // 非編集レイヤーのロック
+        var $displaySize = false; // 寸法を図に明記
         var $frameView = false; // 見え寸領域の外をフレームで覆う
         var $insertTag = true; // タグの挿入
         var $numbering = false; // ファイル名の先頭に番号を付ける
 
-        // Footer stamp
+        // フッタースタンプ
         var $dateStamp = false; // フッターに制作日を記述
         var $ratioStamp = false; // フッターにレイアウトの比率を記述
         var $squareStamp = false; //フッターに平米数を記述
@@ -56,7 +56,7 @@
             'テキスト4', // アートボード右上
             'テキスト5', // アートボード右下
             '枚数',
-            'フォルダ'
+            'フォルダ' // 保存サブディレクトリ
         ];
 
         // CSV 取得サイズ項目キーワード（任意のキーワードに変更可能
@@ -221,8 +221,8 @@
         };
 
         var normalizeChara = function(str) {
-            var meta = ['>', '<', '[?]', ':', ';', '"', '[*]', '[|]', '%', '[.]', '/'];
-            var zen = ['＞', '＜', '？', '：', '；', '”', '＊', '｜', '％', '-', '／'];
+            var meta = ['>', '<', '[?]', ':', ';', '"', '[*]', '[|]', '%', '[.]', '/', ' '];
+            var zen = ['＞', '＜', '？', '：', '；', '”', '＊', '｜', '％', '-', '／', '-'];
             meta.forEach(function(e, i) {
                 var reg = new RegExp(e, 'g');
                 if(reg.test(str)) {
@@ -535,7 +535,7 @@
                 },
                 get: {
                     csvName: function() {
-                        return csvName;
+                        return decodeURI(csvName);
                     },
                     csvPath: function() {
                         return csvPath;
@@ -781,11 +781,11 @@
                             break;
                         case 2: // 概要 下 2
                             if(array[0]) {
-                                x = getBounds(this.items.title).l;
+                                x = getBounds(this.items.size).l;
                                 y = getBounds(array[0]).b - (base * 0.6);
                             } else {
-                                x = getBounds(this.items.title).l;
-                                y = getBounds(this.items.title).b - (base * 0.7);
+                                x = getBounds(this.items.size).l;
+                                y = getBounds(this.items.size).b - (base * 0.7);
                             }
                             if(array[1]) {
                                 x = getBounds(array[1]).r + (getBounds(array[1]).h * 0.4);
@@ -1293,16 +1293,23 @@
             proto.save = function() {
                 var self = this;
                 var fileName
+                var saveFolder = null;
+                var subFolder = false;
                 if($multiArtboards) {
                     fileName = normalizeChara(docData.get.csvName()) + '_SET';
                 } else {
                     fileName = normalizeChara(this.getFullName("_") + '_' + this.getSizeText('outer').replace(/\s/g, ''));
                     if($numbering) fileName = zeroPadding(this.num, 2) + '_' + fileName;
                     if(this.text[4] && this.text[4].text) fileName = fileName + '_[' + this.text[4].text + ']';
-                    if(this.folder) saveFolder = createLocalFolder();
                 }
-                var saveFolder = docData.get.saveFolder();
-                if(!saveFolder) saveFolder = createSaveFolder();
+                if(!$multiArtboards && this.folder) {
+                    subFolder = true;
+                    saveFolder = createSaveFolder();
+                }
+                saveFolder = docData.get.saveFolder();
+                if(!saveFolder) {
+                    saveFolder = createSaveFolder();
+                }
                 var saveFile = new File(saveFolder + "/" + fileName);
                 var options = new IllustratorSaveOptions();
                 if($CompatibleVer) {
@@ -1316,12 +1323,18 @@
 
                 function createSaveFolder() {
                     var name = getDate();
+                    var fullPath = "";
                     if(docData.get.csvName()) {
                         name = name + '_' + docData.get.csvName();
                     } else {
                         name = name + '_EXPORTED';
                     }
-                   var folder = new Folder($outputPath + '/' + name);
+                    if(subFolder) {
+                        fullPath = $outputPath + '/' + name + '/' + self.folder;
+                    } else {
+                        fullPath = $outputPath + '/' + name;
+                    }
+                   var folder = new Folder(fullPath);
                     if(!folder.exists) folder.create();
                     docData.set.saveFolder(folder);
                     return folder;
@@ -2281,16 +2294,19 @@
                                 var layout = layouts[i];
                                 var errorPrefix = (docData.get.inputType() == 'input') ? "入力項目: "  :  "csv " + (i + 1) + "行目: " ;
                                 if(!hasName(layout.names)) error.push(errorPrefix + " 名前 項目が見つかりません。");
-                                if(!layout.size.ow.val)  error.push(errorPrefix + "「" + $keywords2[2] + "」項目が見つかりません。");
-                                if(!layout.size.oh.val)  error.push(errorPrefix + "「" + $keywords2[3] + "」項目が見つかりません。");
-                                if(layout.size.vw.val !== null && layout.size.vh.val == null) error.push(errorPrefix +  "「" + $keywords2[1] + "」項目が見つかりません。");
-                                if(layout.size.vh.val !== null && layout.size.vw.val == null) error.push(errorPrefix + "「" + $keywords2[0] + "」項目が見つかりません。");
+                                if(!layout.size.ow.val) error.push(errorPrefix + "「" + $keywords2[2] + "」項目が見つかりません。");
+                                if(!layout.size.oh.val) error.push(errorPrefix + "「" + $keywords2[3] + "」項目が見つかりません。");
+                                if(layout.size.vw.val && !layout.size.vh.val) error.push(errorPrefix +  "「" + $keywords2[1] + "」項目が見つかりません。");
+                                if(layout.size.vh.val && !layout.size.vw.val) error.push(errorPrefix + "「" + $keywords2[0] + "」項目が見つかりません。");
                                 if(layout.size.ow.val && layout.size.vw.val !== null && (layout.size.vw.val > layout.size.ow.val)) error.push(errorPrefix + "「" + $keywords2[0] + "」の数値が「" + $keywords2[2] + "」よりも大きいです。");
                                 if(layout.size.oh.val && layout.size.vh.val !== null && (layout.size.vh.val > layout.size.oh.val)) error.push(errorPrefix + "「" + $keywords2[1]　+ "」の数値が「" + $keywords2[3] + "」よりも大きいです。");
                             }
-                            if(error.length == 0) return true;
-                            alert(error.join("\n"));
-                            return false;
+                            if(error.length == 0) {
+                                return true;
+                            } else {
+                                alert(error.join("\n"));
+                                return false;
+                            }
                         }
                     }
 
@@ -2493,7 +2509,7 @@
             function changeInputLayoutType(flag) {
                 if(flag) {
                     docData.set.inputType('csv');
-                    loadCSVGroup.info.text = '・' + layoutDataObj.name + '.csv > Layout x ' + (layoutDataObj.data.length - 1);
+                    loadCSVGroup.info.text = '・' + decodeURI(layoutDataObj.name) + '.csv > Layout x ' + (layoutDataObj.data.length - 1);
                     loadCSVGroup.info.graphics.foregroundColor = w.graphics.newPen(w.graphics.PenType.SOLID_COLOR, [0.4, .8, 0],1);
                     layoutTitle.enabled = false;
                     inputSizeGroup.enabled = false;
@@ -2514,6 +2530,7 @@
                 $numbering = numberringGroup.box.value;
                 $displaySize = displaySizeGroup.box.value;
                 $trimMark = trimMarkGroup.box.value;
+                $trimMarkJPN = trimMarkJpnGroup.box.value;
                 $layerLock = layerLockGroup.box.value;
                 $insertTag = insertTagGroup.box.value;
                 $compatibleVer = compatible.input.text;
